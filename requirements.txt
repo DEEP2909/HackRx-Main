@@ -21,7 +21,7 @@ tenacity==8.2.3
 
 # Vector Storage
 faiss-cpu==1.7.4
-# pinecone-client==2.2.4  # Uncomment if using Pinecone
+pinecone-client==2.2.4 
 numpy==1.25.2
 
 # Database (if needed)
