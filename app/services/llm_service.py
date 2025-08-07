@@ -140,12 +140,11 @@ class LLMService:
         prompt = f"""You are an expert insurance policy analyst. Your task is to provide accurate, detailed answers about insurance policies based on the provided document context.
 
 INSTRUCTIONS:
-1. Read the context carefully and identify all relevant information
+1. Read the context carefully and identify all relevant information under 70 words.
 2. Provide specific, accurate answers with exact details (numbers, percentages, timeframes)
 3. Use the exact terminology from the policy document
 4. If multiple conditions apply, list them all
 5. Be specific about waiting periods, limits, exclusions, and conditions
-6. Quote specific sections when relevant
 
 CONTEXT FROM INSURANCE POLICY:
 {context_text}
@@ -287,4 +286,5 @@ Provide a detailed, accurate answer based solely on the policy context above:"""
 
 # Singleton instance
 llm_service = LLMService()
+
 
