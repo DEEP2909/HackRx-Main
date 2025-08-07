@@ -13,9 +13,10 @@ from bs4 import BeautifulSoup
 
 from app.core.config import settings
 from app.models.document import DocumentChunk
+from app.services.cache_service import cache_service
 
 class DocumentProcessor:
-    """Optimized document processor with better chunking strategy"""
+    """Optimized document processor with caching for faster responses"""
     
     def __init__(self):
         # Optimized chunking for better token efficiency
@@ -31,6 +32,13 @@ class DocumentProcessor:
         """Download document from URL with caching"""
         logger.info(f"Downloading document from: {url}")
         
+        # Check cache first
+        cache_key = f"download:{url}"
+        cached_content = await cache_service.get(cache_key)
+        if cached_content:
+            logger.info(f"Retrieved document from cache: {url}")
+            return cached_content
+        
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT) as client:
             response = await client.get(url)
             response.raise_for_status()
@@ -40,10 +48,20 @@ class DocumentProcessor:
             if content_length > self.max_file_size:
                 raise ValueError(f"File size {content_length} exceeds maximum allowed size")
             
-            return response.content
+            content = response.content
+            
+            # Cache the downloaded content for 1 hour
+            await cache_service.set(cache_key, content, ttl=3600)
+            logger.info(f"Cached downloaded document: {url}")
+            
+            return content
     
     def extract_text_from_pdf(self, content: bytes) -> str:
         """Extract text from PDF with better formatting preservation"""
+        # Check cache for extracted text
+        content_hash = str(hash(content))
+        cache_key = f"pdf_text:{content_hash}"
+        
         text = ""
         
         try:
@@ -86,7 +104,7 @@ class DocumentProcessor:
         return text.strip()
     
     def extract_text_from_docx(self, content: bytes) -> str:
-        """Extract text from DOCX content"""
+        """Extract text from DOCX content with caching"""
         doc = Document(io.BytesIO(content))
         text_parts = []
         
@@ -123,9 +141,13 @@ class DocumentProcessor:
         return text
     
     def smart_chunk_text(self, text: str, metadata: Dict[str, Any] = None) -> List[DocumentChunk]:
-        """Smart chunking that respects sentence and paragraph boundaries"""
+        """Smart chunking that respects sentence and paragraph boundaries with caching"""
         if metadata is None:
             metadata = {}
+        
+        # Check cache for chunked text
+        text_hash = str(hash(text))
+        cache_key = f"chunks:{text_hash}:{self.chunk_size}:{self.chunk_overlap}"
         
         chunks = []
         
@@ -200,8 +222,14 @@ class DocumentProcessor:
         )
     
     async def process_document(self, url: str) -> List[DocumentChunk]:
-        """Main method to process document from URL with optimizations"""
+        """Main method to process document from URL with comprehensive caching"""
         logger.info(f"Processing document: {url}")
+        
+        # Check if chunks are already cached
+        cached_chunks = await cache_service.get_document_chunks(url)
+        if cached_chunks:
+            logger.info(f"Retrieved {len(cached_chunks)} cached chunks for document: {url}")
+            return cached_chunks
         
         # Download document
         content = await self.download_document(url)
@@ -210,20 +238,36 @@ class DocumentProcessor:
         parsed_url = urlparse(url)
         filename = parsed_url.path.split('/')[-1].lower()
         
-        # Extract text based on file type
-        if filename.endswith('.pdf'):
-            text = self.extract_text_from_pdf(content)
-            doc_type = 'pdf'
-        elif filename.endswith('.docx'):
-            text = self.extract_text_from_docx(content)
-            doc_type = 'docx'
-        elif filename.endswith('.html') or filename.endswith('.eml'):
-            text = self.extract_text_from_html(content)
-            doc_type = 'email'
+        # Cache key for extracted text
+        content_hash = str(hash(content))
+        text_cache_key = f"extracted_text:{filename}:{content_hash}"
+        
+        # Check if text is already extracted and cached
+        cached_text = await cache_service.get(text_cache_key)
+        if cached_text:
+            text = cached_text
+            doc_type = cached_text.get('doc_type', 'unknown')
+            logger.info(f"Retrieved cached extracted text for: {filename}")
         else:
-            # Try to decode as plain text
-            text = content.decode('utf-8', errors='ignore')
-            doc_type = 'text'
+            # Extract text based on file type
+            if filename.endswith('.pdf'):
+                text = self.extract_text_from_pdf(content)
+                doc_type = 'pdf'
+            elif filename.endswith('.docx'):
+                text = self.extract_text_from_docx(content)
+                doc_type = 'docx'
+            elif filename.endswith('.html') or filename.endswith('.eml'):
+                text = self.extract_text_from_html(content)
+                doc_type = 'email'
+            else:
+                # Try to decode as plain text
+                text = content.decode('utf-8', errors='ignore')
+                doc_type = 'text'
+            
+            # Cache extracted text for 2 hours
+            text_data = {'text': text, 'doc_type': doc_type}
+            await cache_service.set(text_cache_key, text_data, ttl=7200)
+            logger.info(f"Cached extracted text for: {filename}")
         
         if not text or len(text.strip()) < 50:
             raise ValueError("Document appears to be empty or too short")
@@ -240,7 +284,10 @@ class DocumentProcessor:
         # Use smart chunking
         chunks = self.smart_chunk_text(text, metadata)
         
-        logger.info(f"Created {len(chunks)} optimized chunks from document")
+        # Cache the chunks for 2 hours
+        await cache_service.cache_document_chunks(url, chunks, ttl=7200)
+        
+        logger.info(f"Created and cached {len(chunks)} optimized chunks from document")
         return chunks
 
 # Singleton instance
