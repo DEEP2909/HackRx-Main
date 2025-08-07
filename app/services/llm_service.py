@@ -152,7 +152,7 @@ CONTEXT FROM INSURANCE POLICY:
 QUESTION: {question}
 
 REQUIREMENTS FOR YOUR ANSWER:
-- Be comprehensive and detailed (10-65 words)
+- Be to the point and concise (20 to 70 words)
 - Include specific numbers, percentages, or timeframes mentioned in the policy
 - Use exact policy language when possible
 - If there are conditions or exceptions, mention them
@@ -286,6 +286,7 @@ Provide a detailed, accurate answer based solely on the policy context above:"""
 
 # Singleton instance
 llm_service = LLMService()
+
 
 
 
