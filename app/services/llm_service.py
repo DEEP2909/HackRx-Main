@@ -12,7 +12,7 @@ class LLMService:
     
     def __init__(self):
         self.api_key = settings.OPENAI_API_KEY
-        self.model = "gpt-4o-mini"  # Use GPT-4o-mini for better accuracy
+        self.model = "gpt-4.1"  # Use GPT-4o-mini for better accuracy
         self.max_tokens = 2000  # Increased for more detailed answers
         self.temperature = 0.0  # Deterministic responses for accuracy
         openai.api_key = self.api_key
@@ -287,3 +287,4 @@ Provide a detailed, accurate answer based solely on the policy context above:"""
 
 # Singleton instance
 llm_service = LLMService()
+
