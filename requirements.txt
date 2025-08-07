@@ -23,7 +23,7 @@ tenacity
 
 # Vector Storage
 faiss-cpu
-pinecone-client
+pinecone
 numpy
 
 # Database (if needed)
